@@ -2,6 +2,7 @@
 # Lode | All Rights Reserved
 
 from opensearchpy import AsyncOpenSearch
+from app.config import settings
 
 client = None
 
@@ -11,7 +12,7 @@ def get_opensearch_client():
     global client
     if client is None:
         client = AsyncOpenSearch(
-            hosts=[{"host": "opensearch-node1", "port": 9200}],
-            use_ssl=False,
+            hosts=[{"host": settings.OPENSEARCH_HOST, "port": settings.OPENSEARCH_PORT}],
+            use_ssl=settings.OPENSEARCH_SSL,
         )
     return client

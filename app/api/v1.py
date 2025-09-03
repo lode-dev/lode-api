@@ -3,9 +3,11 @@
 
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, WebSocket, WebSocketDisconnect, Request, Query
+import ollama
 
 from app.db import get_opensearch_client
 from app.websockets import manager
+from app.config import settings
 
 LogEntry = Dict[str, Any]
 router = APIRouter()
@@ -120,3 +122,35 @@ async def get_suggested_filters():
     except Exception as e:
         print(f"Error getting aggregations: {e}")
         return {"error": "Failed to get aggregations"}
+
+
+@router.websocket("/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            question = await websocket.receive_text()
+
+            # todo - find relevant logs to pass
+            # search_results = await client.search(...)
+
+            prompt = f"""
+            You are an expert debugging assistant named Lode.
+            A user has the following question about their application logs: "{question}"
+            Provide a helpful, concise answer.
+            """
+
+            ollama_client = ollama.AsyncClient(host=f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}")
+
+            stream = await ollama_client.chat(
+                model='phi3:mini',
+                messages=[{'role': 'user', 'content': prompt}],
+                stream=True
+            )
+
+            async for chunk in stream:
+                token = chunk['message']['content']
+                await websocket.send_text(token)
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
