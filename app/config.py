@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     OLLAMA_HOST: str = "ollama"
     OLLAMA_PORT: int = 11434
+    OLLAMA_MODEL: str = "phi3:mini"
 
     # REDIS_HOST: str = "redis"
     # POSTGRES_USER: str = "user"
