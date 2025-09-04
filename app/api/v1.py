@@ -186,7 +186,7 @@ async def websocket_chat(websocket: WebSocket):
                     ollama_client = ollama.AsyncClient(host=f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}")
 
                     stream = await ollama_client.chat(
-                        model='phi3:mini',
+                        model=settings.OLLAMA_MODEL,
                         messages=[{'role': 'user', 'content': prompt}],
                         stream=True
                     )
@@ -207,7 +207,7 @@ async def websocket_chat(websocket: WebSocket):
                     ollama_client = ollama.AsyncClient(host=f"http://{settings.OLLAMA_HOST}:{settings.OLLAMA_PORT}")
 
                     stream = await ollama_client.chat(
-                        model='phi3:mini',
+                        model=settings.OLLAMA_MODEL,
                         messages=[{'role': 'user', 'content': prompt}],
                         stream=True
                     )
