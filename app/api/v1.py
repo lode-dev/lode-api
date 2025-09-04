@@ -130,6 +130,7 @@ async def get_suggested_filters():
 async def websocket_chat(websocket: WebSocket):
     await manager.connect(websocket)
     current_stream_task = None
+    is_streaming = False
     
     try:
         while True:
@@ -137,17 +138,31 @@ async def websocket_chat(websocket: WebSocket):
             
             # Check for interruption command
             if message_text == "INTERRUPT":
-                if current_stream_task and not current_stream_task.done():
+                print(f"[DEBUG] INTERRUPT command received")
+                print(f"[DEBUG] Is streaming: {is_streaming}")
+                print(f"[DEBUG] Current stream task: {current_stream_task}")
+                if current_stream_task:
+                    print(f"[DEBUG] Task done status: {current_stream_task.done()}")
+                if is_streaming and current_stream_task and not current_stream_task.done():
+                    print(f"[DEBUG] Cancelling current stream task")
                     current_stream_task.cancel()
-                    await websocket.send_text("\n\n[Stream interrupted by user]\n")
+                    is_streaming = False
+                    print(f"[DEBUG] Stream cancelled silently")
+                else:
+                    print(f"[DEBUG] No active stream to cancel")
                 continue
             
             # Cancel any existing stream before starting a new one
-            if current_stream_task and not current_stream_task.done():
+            if is_streaming and current_stream_task and not current_stream_task.done():
+                print(f"[DEBUG] Cancelling existing stream task before starting new one")
                 current_stream_task.cancel()
+                is_streaming = False
             
             async def handle_message():
+                nonlocal is_streaming
                 try:
+                    is_streaming = True
+                    print(f"[DEBUG] Starting stream, is_streaming set to True")
                     # Parse the structured JSON message
                     message_data = json.loads(message_text)
                     question = message_data.get("question", "")
@@ -192,6 +207,9 @@ async def websocket_chat(websocket: WebSocket):
                     )
 
                     async for chunk in stream:
+                        if not is_streaming:  # Check if stream was interrupted
+                            print(f"[DEBUG] Stream was interrupted, breaking out of loop")
+                            break
                         token = chunk['message']['content']
                         await websocket.send_text(token)
                         
@@ -213,22 +231,34 @@ async def websocket_chat(websocket: WebSocket):
                     )
 
                     async for chunk in stream:
+                        if not is_streaming:  # Check if stream was interrupted
+                            print(f"[DEBUG] Stream was interrupted, breaking out of loop")
+                            break
                         token = chunk['message']['content']
                         await websocket.send_text(token)
                 except asyncio.CancelledError:
                     # Stream was cancelled, exit gracefully
+                    print(f"[DEBUG] Stream task cancelled via asyncio.CancelledError")
                     raise
                 except Exception as e:
                     await websocket.send_text(f"\n\n[Error: {str(e)}]\n")
+                finally:
+                    is_streaming = False
+                    print(f"[DEBUG] Stream finished, is_streaming set to False")
             
             # Start the message handling as a task that can be cancelled
             current_stream_task = asyncio.create_task(handle_message())
+            print(f"[DEBUG] Created new stream task: {current_stream_task}")
             
             try:
                 await current_stream_task
+                print(f"[DEBUG] Stream task completed normally")
             except asyncio.CancelledError:
                 # Task was cancelled, continue to next message
+                print(f"[DEBUG] Stream task was cancelled successfully")
                 pass
+            finally:
+                is_streaming = False
 
     except WebSocketDisconnect:
         if current_stream_task and not current_stream_task.done():
